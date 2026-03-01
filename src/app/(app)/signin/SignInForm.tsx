@@ -131,7 +131,7 @@ export default function SignInForm() {
                     href="/"
                     className="text-sm text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
                 >
-                    ← Back to Atlas
+                    ← Back to Stellar Papers
                 </Link>
                 <ThemeToggle />
             </div>
