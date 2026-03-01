@@ -1,113 +1,110 @@
-import { NextResponse } from "next/server";
+import neo4j from "neo4j-driver";
+import { NextRequest, NextResponse } from "next/server";
+import { runQuery } from "../../../lib/neo4j";
+import { toNode } from "../../../lib/transform";
+import { GraphFilters, GraphResponse, GraphEdge } from "../../../types/graph";
 
-const BASE_URL = "https://api.openalex.org";
-const EMAIL = process.env.EMAIL ?? "test@example.com";
-const DELAY = 150;
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
 
-function sleep(ms: number) {
-    return new Promise((r) => setTimeout(r, ms));
-}
+  const filters: GraphFilters = {
+    author: searchParams.get("author") ?? undefined,
+    publication_year_start: searchParams.get("publication_year_start")
+      ? parseInt(searchParams.get("publication_year_start")!)
+      : undefined,
+    publication_year_end: searchParams.get("publication_year_end")
+      ? parseInt(searchParams.get("publication_year_end")!)
+      : undefined,
+    institution: searchParams.get("institution") ?? undefined,
+    domain: searchParams.get("domain") ?? undefined,
+    keyword: searchParams.get("keyword") ?? undefined,
+    limit: searchParams.get("limit")
+      ? parseInt(searchParams.get("limit")!)
+      : 100,
+  };
 
-function reconstructAbstract(invertedIndex: Record<string, number[]> | null): string | null {
-    if (!invertedIndex) return null;
-    const words: [number, string][] = [];
-    for (const [word, positions] of Object.entries(invertedIndex)) {
-        for (const pos of positions) {
-            words.push([pos, word]);
-        }
+  try {
+    const conditions: string[] = [];
+    const params: Record<string, any> = {
+      limit: neo4j.int(filters.limit ?? 100),
+    };
+
+    if (filters.author) {
+      conditions.push(
+        "ANY(a IN p.authorships WHERE toLower(a) CONTAINS toLower($author))",
+      );
+      params.author = filters.author;
     }
-    words.sort((a, b) => a[0] - b[0]);
-    return words.map(([, w]) => w).join(" ");
-}
-
-async function fetchPapers(query: string, target: number) {
-    const papers: any[] = [];
-    let cursor = "*";
-
-    while (papers.length < target && cursor) {
-        const params = new URLSearchParams({
-            search: query,
-            per_page: "200",
-            cursor,
-            mailto: EMAIL,
-            select: "id,doi,title,display_name,publication_year,cited_by_count,authorships,abstract_inverted_index,referenced_works,type,primary_topic",
-        });
-
-        const resp = await fetch(`${BASE_URL}/works?${params}`);
-        if (!resp.ok) break;
-
-        const data = await resp.json();
-        const results = data.results || [];
-        if (!results.length) break;
-
-        papers.push(...results);
-        cursor = data.meta?.next_cursor;
-        await sleep(DELAY);
+    if (filters.publication_year_start) {
+      conditions.push("p.publication_year >= $publication_year_start");
+      params.publication_year_start = filters.publication_year_start;
     }
-
-    return papers.slice(0, target);
-}
-
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get("query") || "large language models";
-    const target = Math.min(parseInt(searchParams.get("target") || "200"), 500);
-
-    const rawPapers = await fetchPapers(query, target);
-
-    // Build a set of all paper IDs in our dataset
-    const paperIds = new Set(rawPapers.map((p: any) => p.id));
-
-    // Count in-degree: how many papers in our dataset reference each work
-    const inDegree: Record<string, number> = {};
-    const refTitles: Record<string, string> = {};
-
-    for (const p of rawPapers) {
-        for (const refId of p.referenced_works || []) {
-            inDegree[refId] = (inDegree[refId] || 0) + 1;
-        }
+    if (filters.publication_year_end) {
+      conditions.push("p.publication_year <= $publication_year_end");
+      params.publication_year_end = filters.publication_year_end;
+    }
+    if (filters.domain) {
+      conditions.push("toLower(p.domain) CONTAINS toLower($domain)");
+      params.domain = filters.domain;
+    }
+    if (filters.keyword) {
+      conditions.push(
+        "ANY(k IN p.keywords WHERE toLower(k) CONTAINS toLower($keyword))",
+      );
+      params.keyword = filters.keyword;
     }
 
-    // Nodes: every paper in our dataset
-    const nodes = rawPapers.map((p: any) => ({
-        id: p.id,
-        title: p.display_name || p.title,
-        year: p.publication_year,
-        citedByCount: p.cited_by_count,
-        type: p.type,
-        abstract: reconstructAbstract(p.abstract_inverted_index),
-        doi: p.doi,
-        subject: p.primary_topic?.domain?.display_name || "Unknown",
-        subfield: p.primary_topic?.subfield?.display_name || null,
-        authors: (p.authorships || []).slice(0, 5).map((a: any) => ({
-            name: a.author?.display_name,
-            institution: a.institutions?.[0]?.display_name || null,
-        })),
-        inDegree: inDegree[p.id] || 0,
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const nodeCypher = `
+      MATCH (p:Paper)
+      ${whereClause}
+      RETURN p
+      LIMIT $limit
+    `;
+
+    const nodeRecords = await runQuery(nodeCypher, params);
+    const nodeIds = new Set<string>();
+    const nodes = nodeRecords.map((record) => {
+      const node = toNode(record.p.properties);
+      nodeIds.add(node.id);
+      return node;
+    });
+
+    const edgeCypher = `
+      MATCH (a:Paper)-[r:CITES]->(b:Paper)
+      WHERE a.id IN $nodeIds AND b.id IN $nodeIds
+      RETURN a.id AS source, b.id AS target, type(r) AS rel_type
+    `;
+
+    const edgeRecords = await runQuery(edgeCypher, {
+      nodeIds: Array.from(nodeIds),
+    });
+
+    const edges: GraphEdge[] = edgeRecords.map((record) => ({
+      source: record.source,
+      target: record.target,
+      type: "cites",
+      weight: 1,
     }));
 
-    // Collect unique subjects for the legend
-    const subjects = [...new Set(nodes.map((n: any) => n.subject))].sort();
+    const response: GraphResponse = {
+      nodes,
+      edges,
+      meta: {
+        total_nodes: nodes.length,
+        total_edges: edges.length,
+        filters_applied: filters,
+      },
+    };
 
-    // Links: only where BOTH source and target are in our dataset
-    const links: { source: string; target: string }[] = [];
-    for (const p of rawPapers) {
-        for (const refId of p.referenced_works || []) {
-            if (paperIds.has(refId)) {
-                links.push({ source: p.id, target: refId });
-            }
-        }
-    }
-
-    return NextResponse.json({
-        nodes,
-        links,
-        meta: {
-            query,
-            totalPapers: nodes.length,
-            totalLinks: links.length,
-            maxInDegree: Math.max(...nodes.map((n: any) => n.inDegree), 0),
-            subjects,
-        },
-    });
+    return NextResponse.json(response);
+  } catch (error) {
+    console.error("Graph API error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch graph data" },
+      { status: 500 },
+    );
+  }
 }
