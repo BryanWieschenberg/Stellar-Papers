@@ -1,7 +1,7 @@
 import neo4j from "neo4j-driver";
 import { NextRequest, NextResponse } from "next/server";
-import { runQuery } from "@/lib/neo4j";
-import { toNode } from "@/lib/transform";
+import { runQuery } from "../../../lib/neo4j";
+import { toNode } from "../../../lib/transform";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
