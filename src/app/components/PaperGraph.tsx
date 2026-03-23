@@ -620,7 +620,7 @@ export default function PaperGraph() {
         }
 
         fgRef.current.d3Force("color-clustering", colorClusterForce);
-        fgRef.current.d3Force("charge", null);
+
         fgRef.current.d3Force("collision", null);
 
         fgRef.current.d3ReheatSimulation();
@@ -634,15 +634,6 @@ export default function PaperGraph() {
         hoveredRef.current = (node as GraphNode) || null;
         setHoveredNode((node as GraphNode) || null);
     }, []);
-
-    const onNodeDrag = useCallback(() => {}, []);
-
-    const onNodeDragEnd = useCallback(() => {
-        (graphData.nodes as Array<GraphNode & { vx?: number; vy?: number }>).forEach(n => {
-            n.vx = 0;
-            n.vy = 0;
-        });
-    }, [graphData.nodes]);
 
     const onNodeClick = useCallback((node: object) => {
         setSelectedNode(node as GraphNode);
@@ -967,8 +958,6 @@ export default function PaperGraph() {
                     d3AlphaDecay={0.025}
                     d3VelocityDecay={0.35}
                     enableNodeDrag
-                    onNodeDrag={onNodeDrag}
-                    onNodeDragEnd={onNodeDragEnd}
                     enableZoomInteraction
                     onRenderFramePost={(ctx, globalScale) => {
                         if (selectedNode && selectedNode.x != null && selectedNode.y != null) {
