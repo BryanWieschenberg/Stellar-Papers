@@ -571,11 +571,12 @@ export default function PaperGraph() {
         const REPEL_RADIUS = 100;
 
         function colorClusterForce(alpha: number) {
-            const nodes = graphData.nodes as Array<GraphNode & { vx?: number; vy?: number }>;
+            const nodes = graphData.nodes as Array<GraphNode & { vx?: number; vy?: number; fx?: number; fy?: number }>;
             for (let i = 0; i < nodes.length; i++) {
                 for (let j = i + 1; j < nodes.length; j++) {
                     const a = nodes[i];
                     const b = nodes[j];
+                    if (a.fx != null || b.fx != null) continue;
                     if (a.x == null || a.y == null || b.x == null || b.y == null) continue;
 
                     const dx = b.x - a.x || 0.001;
