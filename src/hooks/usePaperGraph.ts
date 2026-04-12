@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo } from "react";
-import { GraphData, GraphNode } from "../../types/paper-graph";
-import { fetchGraph } from "../../lib/paperGraphData";
+import { GraphData, GraphNode } from "../types/paper-graph";
+import { fetchGraph } from "../lib/paperGraphData";
 
 export function usePaperGraph(
     maxNodes: number,

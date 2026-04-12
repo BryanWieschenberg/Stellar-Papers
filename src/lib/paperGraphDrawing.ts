@@ -1,5 +1,5 @@
-import { GraphNode } from "../../types/paper-graph";
-import { DEFAULT_COLOR, hexToRgb, getNodeRadius } from "../../lib/paperGraphUtils";
+import { GraphNode } from "../types/paper-graph";
+import { DEFAULT_COLOR, hexToRgb, getNodeRadius } from "./paperGraphUtils";
 
 export const drawNode = (
     node: object,

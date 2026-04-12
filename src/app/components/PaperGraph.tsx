@@ -15,8 +15,8 @@ import { GraphNode } from "../../types/paper-graph";
 import { getNodeRadius } from "../../lib/paperGraphUtils";
 import { buildPaperGraphTheme } from "../../lib/paperGraphTheme";
 import { useColorClusterForce } from "../../hooks/useColorClusterForce";
-import { usePaperGraph } from "../hooks/usePaperGraph";
-import { drawNode, drawLink, paintNodePointerArea } from "../lib/paperGraphDrawing";
+import { usePaperGraph } from "../../hooks/usePaperGraph";
+import { drawNode, drawLink, paintNodePointerArea } from "../../lib/paperGraphDrawing";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
     ssr: false,
