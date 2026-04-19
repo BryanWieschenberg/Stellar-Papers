@@ -39,6 +39,7 @@ export default function PaperGraph() {
     const fgRef = useRef<{
         d3Force: (name: string, force: unknown) => void;
         d3ReheatSimulation: () => void;
+        zoom: (k?: number, ms?: number) => number;
     } | null>(null);
     const { theme } = useTheme();
     const isDark = theme === "dark";
@@ -93,6 +94,12 @@ export default function PaperGraph() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const handleZoom = useCallback((factor: number) => {
+        if (!fgRef.current) return;
+        const current = fgRef.current.zoom();
+        fgRef.current.zoom(current * factor, 200);
+    }, []);
+
     const handleNodeHover = useCallback(
         (node: object | null) => {
             const n = node as GraphNode | null;
@@ -125,6 +132,48 @@ export default function PaperGraph() {
                     gap: 8,
                 }}
             >
+                <button
+                    onClick={() => handleZoom(1.4)}
+                    aria-label="Zoom in"
+                    style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        border: `1px solid ${isDark ? "rgba(79,195,247,0.3)" : "rgba(2,132,199,0.25)"}`,
+                        background: isDark ? "rgba(79,195,247,0.08)" : "rgba(2,132,199,0.05)",
+                        color: isDark ? "#4fc3f7" : "#0284c7",
+                        cursor: "pointer",
+                        fontSize: 20,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    +
+                </button>
+                <button
+                    onClick={() => handleZoom(1 / 1.4)}
+                    aria-label="Zoom out"
+                    style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        border: `1px solid ${isDark ? "rgba(79,195,247,0.3)" : "rgba(2,132,199,0.25)"}`,
+                        background: isDark ? "rgba(79,195,247,0.08)" : "rgba(2,132,199,0.05)",
+                        color: isDark ? "#4fc3f7" : "#0284c7",
+                        cursor: "pointer",
+                        fontSize: 20,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    −
+                </button>
                 <button
                     onClick={() => setSavedOpen(!savedOpen)}
                     disabled={!session?.user}

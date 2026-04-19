@@ -1,4 +1,4 @@
-import autocannon from "autocannon";
+const autocannon = require("autocannon");
 
 const requests = [];
 for (let i = 0; i < 1000; i++) {
